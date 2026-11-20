@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Receipts">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>Receipts</title>
+<link rel="apple-touch-icon" id="touchIcon" href="">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<style>
+:root{
+  --bg:#f2f2f7;--card:#fff;--text:#000;--sub:#6c6c70;--sep:rgba(60,60,67,.2);
+  --tint:#007aff;--red:#ff3b30;--green:#34c759;--orange:#ff9500;
+  --fill:rgba(118,118,128,.12);--bar:rgba(249,249,249,.92);
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#000;--card:#1c1c1e;--text:#fff;--sub:#98989f;--sep:rgba(84,84,88,.6);
+  --tint:#0a84ff;--red:#ff453a;--green:#30d158;--orange:#ff9f0a;
+  --fill:rgba(118,118,128,.24);--bar:rgba(22,22,24,.92);
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-text-size-adjust:100%}
+body{padding-top:env(safe-area-inset-top);padding-bottom:calc(env(safe-area-inset-bottom) + 160px)}
+body.locked{overflow:hidden}
+button{font-family:inherit;cursor:pointer}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+.hidden{display:none!important}
+
+/* Header */
+.top{padding:6px 0 2px}
+.toprow{display:flex;justify-content:space-between;align-items:center;min-height:40px}
+.iconbtn{border:0;background:none;color:var(--tint);font-size:17px;padding:8px 2px;display:inline-flex;align-items:center;gap:4px}
+.iconbtn svg{width:22px;height:22px}
+h1{font-size:34px;font-weight:700;letter-spacing:.3px;margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sub{color:var(--sub);font-size:15px;margin-bottom:4px}
+.search{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;padding:0 10px;height:40px;margin:10px 0 8px}
+.search svg{width:18px;height:18px;color:var(--sub);flex:none}
+.search input{flex:1;border:0;background:none;font-size:17px;color:var(--text);outline:none;min-width:0;font-family:inherit}
+.search input::-webkit-search-cancel-button{-webkit-appearance:none}
+.clearq{border:0;background:var(--sub);color:var(--bg);width:18px;height:18px;border-radius:50%;font-size:12px;line-height:18px;padding:0;opacity:.7}
+.filters{display:flex;gap:8px;align-items:stretch;margin-bottom:14px}
+.filters label{flex:1;background:var(--card);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--sub);display:flex;flex-direction:column;min-width:0}
+.filters input[type=date]{border:0;background:none;color:var(--text);font-size:16px;padding:0;-webkit-appearance:none;appearance:none;min-height:22px;width:100%;font-family:inherit;text-align:left}
+.filters input[type=date]::-webkit-date-and-time-value{text-align:left}
+.filters .reset{border:0;background:var(--card);color:var(--tint);border-radius:10px;padding:0 12px;font-size:15px}
+.chips{display:flex;gap:8px;overflow-x:auto;margin:-6px 0 14px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:0;background:var(--card);color:var(--text);border-radius:16px;padding:6px 12px;font-size:14px}
+.chip:active{opacity:.6}
+
+/* Folders */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+.folder{background:var(--card);border-radius:16px;padding:14px;border:0;text-align:left;color:inherit;display:flex;flex-direction:column;gap:4px;min-height:128px;transition:transform .12s}
+.folder:active{transform:scale(.96);opacity:.85}
+.ficon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:21px;margin-bottom:6px;position:relative}
+.ficon svg{width:26px;height:26px}
+.fname{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fmeta{font-size:13px;color:var(--sub)}
+.ftotal{font-size:15px;font-weight:500;margin-top:auto}
+
+/* List */
+.list{background:var(--card);border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px;border:0;background:none;width:100%;text-align:left;color:inherit;position:relative;font-size:17px}
+.row:active{background:var(--fill)}
+.row+.row::before{content:"";position:absolute;top:0;left:74px;right:0;height:.5px;background:var(--sep)}
+.thumb{width:46px;height:58px;border-radius:6px;object-fit:cover;background:var(--fill);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--red)}
+.rmain{flex:1;min-width:0}
+.rtitle{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsub{font-size:14px;color:var(--sub);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ramt{font-weight:600;white-space:nowrap}
+.chev{color:var(--sub);opacity:.5;font-size:20px}
+.badge{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700;color:#fff}
+.b-processing{background:var(--orange)}.b-error{background:var(--red)}.b-review{background:var(--sub)}
+.section-title{font-size:13px;color:var(--sub);text-transform:uppercase;letter-spacing:.3px;margin:18px 14px 6px}
+.empty{text-align:center;color:var(--sub);padding:50px 20px}
+.empty .big{font-size:52px;margin-bottom:8px}
+.empty b{color:var(--text);display:block;font-size:20px;margin-bottom:6px}
+.link{color:var(--tint);background:none;border:0;font-size:inherit;padding:0}
+
+/* Dock */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep)}
+.actions{display:flex;gap:10px;padding:10px 16px 6px;max-width:720px;margin:0 auto}
+.scan{flex:2;height:58px;border-radius:16px;border:0;background:var(--tint);color:#fff;font-size:19px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px}
+.upload{flex:1;height:58px;border-radius:16px;border:0;background:var(--fill);color:var(--tint);font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px}
+.scan:active,.upload:active{transform:scale(.97);opacity:.85}
+.scan svg,.upload svg{width:24px;height:24px}
+.tabs{display:flex;max-width:720px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom)}
+.tab{flex:1;border:0;background:none;color:var(--sub);font-size:10px;font-weight:500;padding:6px 0 4px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab svg{width:26px;height:26px}
+.tab.on{color:var(--tint)}
+
+/* Settings & forms */
+.ghead{font-size:13px;color:var(--sub);text-transform:uppercase;letter-spacing:.3px;margin:22px 14px 6px}
+.gfoot{font-size:13px;color:var(--sub);margin:6px 14px 0;line-height:1.4}
+.group{background:var(--card);border-radius:12px;overflow:hidden}
+.field{display:flex;align-items:center;padding:0 14px;min-height:46px;position:relative;gap:10px}
+.field+.field::before{content:"";position:absolute;top:0;left:14px;right:0;height:.5px;background:var(--sep)}
+.field>span{flex:none;min-width:84px}
+.field select{text-align-last:right;direction:rtl}
+.field input,.field select{flex:1;border:0;background:none;font-size:17px;color:var(--text);text-align:right;outline:none;min-width:0;padding:12px 0;font-family:inherit;-webkit-appearance:none;appearance:none}
+.field input[type=date]::-webkit-date-and-time-value{text-align:right}
+.field .mini{border:0;background:none;color:var(--tint);font-size:15px;padding:6px 0;flex:none}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;border-radius:12px;border:0;background:var(--card);color:var(--tint);font-size:17px;font-weight:500;margin-top:10px;text-decoration:none}
+.btn:active{opacity:.6}
+.btn.primary{background:var(--tint);color:#fff;font-weight:600}
+.btn.danger{color:var(--red)}
+.btn[disabled]{opacity:.4}
+.note{background:var(--card);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--sub);margin-top:10px;line-height:1.4}
+.note.err{color:var(--red)}
+
+/* Sheet */
+.sheet{position:fixed;inset:0;z-index:50;background:var(--bg);transform:translateY(102%);transition:transform .34s cubic-bezier(.2,.85,.25,1);display:flex;flex-direction:column}
+.sheet.open{transform:none}
+.sbar{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 4px) 14px 4px;background:var(--bar);border-bottom:.5px solid var(--sep);min-height:48px}
+.sbar .ttl{font-weight:600;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50%}
+.sbar .iconbtn.bold{font-weight:600}
+.sbody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 16px calc(env(safe-area-inset-bottom) + 30px)}
+.preview{background:var(--card);border-radius:12px;overflow:hidden;text-align:center}
+.preview img{max-width:100%;display:block;margin:0 auto}
+.preview iframe{width:100%;height:62vh;border:0;background:#fff}
+.status{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:12px 14px;margin-top:12px;font-size:15px}
+.status.err{color:var(--red)}
+
+/* Overlay (export) */
+.overlay{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.open{opacity:1;pointer-events:auto}
+.panel{background:var(--bg);width:100%;max-width:720px;border-radius:16px 16px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 18px);transform:translateY(30px);transition:transform .25s}
+.overlay.open .panel{transform:none}
+.panel h2{margin:0 0 4px;font-size:20px}
+.panel p{margin:0 0 6px;color:var(--sub);font-size:15px}
+
+.spin{width:18px;height:18px;border:2.5px solid var(--fill);border-top-color:var(--orange);border-radius:50%;animation:sp .8s linear infinite;flex:none;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 10px);transform:translate(-50%,-80px);background:rgba(40,40,42,.95);color:#fff;padding:10px 16px;border-radius:14px;font-size:15px;z-index:100;transition:transform .3s;max-width:90vw;text-align:center}
+.toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<!-- ============ RECEIPTS TAB ============ -->
+<div id="tabReceipts" class="wrap">
+  <header class="top">
+    <div class="toprow">
+      <button id="backBtn" class="iconbtn hidden" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Vendors
+      </button>
+      <span id="topSpacer"></span>
+      <div style="display:flex;gap:16px">
+        <button id="renameBtn" class="iconbtn hidden">Rename</button>
+        <button id="exportBtn" class="iconbtn" aria-label="Save to iPhone Files">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg>
+        </button>
+      </div>
+    </div>
+    <h1 id="pageTitle">Receipts</h1>
+    <div class="sub" id="pageSub"></div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search vendors" autocomplete="off" autocorrect="off" enterkeyhint="search">
+      <button id="clearQ" class="clearq hidden" aria-label="Clear">✕</button>
+    </div>
+    <div class="filters">
+      <label>From<input type="date" id="dFrom"></label>
+      <label>To<input type="date" id="dTo"></label>
+      <button class="reset" id="resetDates">Clear</button>
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip" data-range="month">This month</button>
+      <button class="chip" data-range="lastmonth">Last month</button>
+      <button class="chip" data-range="90">Last 90 days</button>
+      <button class="chip" data-range="year">This year</button>
+      <button class="chip" data-range="lastyear">Last year</button>
+    </div>
+  </header>
+  <main id="content"></main>
+</div>
+
+<!-- ============ SETTINGS TAB ============ -->
+<div id="tabSettings" class="wrap hidden">
+  <header class="top"><div class="toprow"></div><h1>Settings</h1></header>
+
+  <div class="ghead">Reading Receipts</div>
+  <div class="group">
+    <div class="field"><span>Date order</span>
+      <select id="sOrder"><option value="MDY">Month / Day (US)</option><option value="DMY">Day / Month</option></select>
+    </div>
+    <div class="field"><span>Currency</span>
+      <input id="sCur" maxlength="3" placeholder="USD" autocapitalize="characters" autocorrect="off" spellcheck="false">
+    </div>
+  </div>
+  <div class="gfoot">Receipts are read right here on your iPhone and never leave it. The reader downloads once (a few MB) the first time you scan. When you correct a store name, the app remembers it for next time.</div>
+  <button class="btn" id="prepReader">Download Reader Now</button>
+  <div id="prepOut" class="note hidden"></div>
+
+  <div class="ghead">Storage</div>
+  <div class="group">
+    <div class="field"><span>Receipts</span><input id="stCount" readonly></div>
+    <div class="field"><span>Space used</span><input id="stUsed" readonly></div>
+    <div class="field"><span>Persistent</span><input id="stPersist" readonly></div>
+  </div>
+  <div class="gfoot">Safari can clear website data it thinks is unused. Adding this app to your Home Screen protects it, but export a backup to Files now and then.</div>
+  <button class="btn" id="exportAll">Save All Receipts to iPhone Files</button>
+  <button class="btn danger" id="wipe">Delete All Receipts</button>
+  <div style="height:30px"></div>
+</div>
+
+<!-- ============ DOCK ============ -->
+<div class="dock">
+  <div class="actions" id="actions">
+    <button class="scan" id="scanBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2"/><circle cx="12" cy="12" r="3.2"/></svg>
+      Scan Receipt
+    </button>
+    <button class="upload" id="uploadBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg>
+      Upload
+    </button>
+  </div>
+  <nav class="tabs">
+    <button class="tab on" data-tab="receipts">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A2.5 2.5 0 015.5 4h4l2 2.2h7A2.5 2.5 0 0121 8.7v8.8a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 17.5z"/></svg>Receipts
+    </button>
+    <button class="tab" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>Settings
+    </button>
+  </nav>
+</div>
+
+<input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileInput" accept="image/*,application/pdf,.pdf,.heic,.heif" multiple hidden>
+
+<!-- ============ DETAIL SHEET ============ -->
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="sbar">
+    <button class="iconbtn" id="dCancel">Cancel</button>
+    <div class="ttl" id="dTitle">Receipt</div>
+    <button class="iconbtn bold" id="dSave">Save</button>
+  </div>
+  <div class="sbody">
+    <div class="preview" id="dPreview"></div>
+    <div id="dStatus"></div>
+    <details id="dTextWrap" class="note hidden"><summary>Text found on this receipt</summary><pre id="dText" style="white-space:pre-wrap;font-size:13px;margin:8px 0 0;font-family:ui-monospace,Menlo,monospace"></pre></details>
+    <div class="ghead">Details</div>
+    <div class="group">
+      <div class="field"><span>Vendor</span><input id="fVendor" list="vendorList" placeholder="Vendor name" autocorrect="off"></div>
+      <div class="field"><span>Date</span><input id="fDate" type="date"></div>
+      <div class="field"><span>Total</span><input id="fTotal" inputmode="decimal" placeholder="0.00"></div>
+      <div class="field"><span>Currency</span><input id="fCur" maxlength="3" placeholder="USD" autocapitalize="characters" autocorrect="off"></div>
+    </div>
+    <datalist id="vendorList"></datalist>
+    <button class="btn" id="dRescan">Read Receipt Again</button>
+    <button class="btn" id="dShare">Save This File to iPhone</button>
+    <button class="btn danger" id="dDelete">Delete Receipt</button>
+  </div>
+</div>
+
+<!-- ============ EXPORT PANEL ============ -->
+<div class="overlay" id="exportOverlay">
+  <div class="panel">
+    <h2 id="exTitle">Save to iPhone Files</h2>
+    <p id="exMsg"></p>
+    <button class="btn primary" id="exGo" disabled>Preparing…</button>
+    <button class="btn" id="exCancel">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- helpers ---------- */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const todayISO = () => isoDate(new Date());
+function isoDate(d){ const z = n => String(n).padStart(2,'0'); return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`; }
+
+let toastTimer;
+function toast(msg, ms = 2400){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+const settings = {
+  get dateOrder(){ return localStorage.getItem('rs_order') || 'MDY'; },
+  set dateOrder(v){ localStorage.setItem('rs_order', v === 'DMY' ? 'DMY' : 'MDY'); },
+  get aliases(){ try { return JSON.parse(localStorage.getItem('rs_alias') || '{}'); } catch { return {}; } },
+  setAlias(raw, name){ const a = this.aliases; a[raw.toLowerCase()] = name; try { localStorage.setItem('rs_alias', JSON.stringify(a)); } catch {} },
+  get currency(){ return localStorage.getItem('rs_cur') || 'USD'; },
+  set currency(v){ localStorage.setItem('rs_cur', (v || 'USD').trim().toUpperCase().slice(0,3)); }
+};
+
+function fmtMoney(n, cur){
+  if (n == null || isNaN(n)) return '—';
+  try { return new Intl.NumberFormat(undefined, {style:'currency', currency: cur || settings.currency}).format(n); }
+  catch { return `${Number(n).toFixed(2)} ${cur || ''}`.trim(); }
+}
+function fmtDate(d){
+  if (!d || !DATE_RE.test(d)) return 'No date';
+  return new Date(d + 'T00:00:00').toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
+}
+function hue(str){ let h = 0; for (const c of str) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function fmtBytes(b){ if (!b) return '0 KB'; const u=['B','KB','MB','GB']; let i=0; while(b>=1024&&i<3){b/=1024;i++;} return b.toFixed(i?1:0)+' '+u[i]; }
+
+/* ---------- IndexedDB ---------- */
+const DB_NAME = 'receipt-vault', STORE = 'receipts';
+let db;
+function openDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, {keyPath:'id'});
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function req(mode, fn){
+  return new Promise((res, rej) => {
+    const t = db.transaction(STORE, mode); const s = t.objectStore(STORE);
+    const r = fn(s);
+    t.oncomplete = () => res(r && r.result);
+    t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('Storage aborted'));
+  });
+}
+const dbAll = () => req('readonly', s => s.getAll());
+const dbPut = (o) => req('readwrite', s => s.put(o));
+const dbDel = (id) => req('readwrite', s => s.delete(id));
+const dbClear = () => req('readwrite', s => s.clear());
+
+async function requestPersist(){
+  try { if (navigator.storage && navigator.storage.persist && !(await navigator.storage.persisted())) await navigator.storage.persist(); } catch {}
+}
+
+/* ---------- object URLs ---------- */
+const urls = new Map();
+function objURL(key, blob){
+  if (!blob) return '';
+  if (!urls.has(key)) urls.set(key, URL.createObjectURL(blob));
+  return urls.get(key);
+}
+function revoke(id){
+  for (const k of [id, id + ':t']) if (urls.has(k)) { URL.revokeObjectURL(urls.get(k)); urls.delete(k); }
+}
+
+/* ---------- images ---------- */
+async function loadImage(blob){
+  if ('createImageBitmap' in window) {
+    try { return await createImageBitmap(blob, {imageOrientation:'from-image'}); } catch {}
+  }
+  return new Promise((res, rej) => {
+    const u = URL.createObjectURL(blob); const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(u); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Could not read this image')); };
+    img.src = u;
+  });
+}
+async function resizeImage(blob, max, quality){
+  const img = await loadImage(blob);
+  const w = img.width, h = img.height;
+  const s = Math.min(1, max / Math.max(w, h));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  if (img.close) img.close();
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Image conversion failed')), 'image/jpeg', quality));
+}
+function blobToBase64(blob){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(',')[1]);
+    fr.onerror = () => rej(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+
+/* ---------- on-device reading (OCR) ---------- */
+const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const scripts = {};
+function loadScript(src){
+  if (!scripts[src]) {
+    scripts[src] = new Promise((res, rej) => {
+      const s = document.createElement('script'); s.src = src;
+      s.onload = res;
+      s.onerror = () => { delete scripts[src]; rej(new Error('Could not download the reader. Connect to the internet once and try again.')); };
+      document.head.appendChild(s);
+    });
+  }
+  return scripts[src];
+}
+let ocrLogger = null, workerP = null;
+function getWorker(){
+  if (!workerP) {
+    workerP = (async () => {
+      await loadScript(TESSERACT_URL);
+      return Tesseract.createWorker('eng', 1, {logger: m => { if (ocrLogger) ocrLogger(m); }});
+    })();
+    workerP.catch(() => { workerP = null; });
+  }
+  return workerP;
+}
+
+// grayscale + contrast boost helps the reader with faded thermal paper
+async function prepCanvas(source){
+  const img = source instanceof HTMLCanvasElement ? source : await loadImage(source);
+  const w = img.width, h = img.height, s = Math.min(1, 2000 / Math.max(w, h));
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * s); c.height = Math.round(h * s);
+  const x = c.getContext('2d', {willReadFrequently: true});
+  x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(img, 0, 0, c.width, c.height);
+  if (img.close) img.close();
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    let g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+    g = Math.max(0, Math.min(255, (g - 128) * 1.5 + 140));
+    p[i] = p[i + 1] = p[i + 2] = g;
+  }
+  x.putImageData(d, 0, 0);
+  return c;
+}
+async function ocr(source){
+  const worker = await getWorker();
+  const { data } = await worker.recognize(await prepCanvas(source));
+  return data.text || '';
+}
+
+async function readPdf(blob){
+  await loadScript(PDFJS_URL);
+  const lib = window.pdfjsLib;
+  lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+  const pdf = await lib.getDocument({data: new Uint8Array(await blob.arrayBuffer())}).promise;
+  let text = '';
+  for (let n = 1; n <= Math.min(pdf.numPages, 3); n++) {
+    const page = await pdf.getPage(n);
+    const tc = await page.getTextContent();
+    const rows = new Map();
+    for (const it of tc.items) {
+      if (!it.str) continue;
+      const y = Math.round(it.transform[5] / 3);
+      if (!rows.has(y)) rows.set(y, []);
+      rows.get(y).push({x: it.transform[4], s: it.str});
+    }
+    text += [...rows.entries()].sort((a, b) => b[0] - a[0])
+      .map(([, its]) => its.sort((a, b) => a.x - b.x).map(i => i.s).join(' ')).join('\n') + '\n';
+  }
+  if ((text.match(/[A-Za-z]/g) || []).length < 20) {   // scanned PDF: read page 1 as an image
+    const page = await pdf.getPage(1);
+    const vp1 = page.getViewport({scale: 1});
+    const vp = page.getViewport({scale: Math.min(3, 1800 / vp1.width)});
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    await page.render({canvasContext: c.getContext('2d'), viewport: vp}).promise;
+    text = await ocr(c);
+  }
+  return text;
+}
+
+/* ---------- turning text into vendor / date / total ---------- */
+const BRANDS = [
+  ["Sam's Club", /sam'?s\s*club/i], ['Amazon', /amazon|\bamzn\b/i], ['Walmart', /wal[\s\-*]?mart/i],
+  ['Costco', /costco/i], ['Target', /\btarget\b/i], ['Home Depot', /home\s*depot/i], ["Lowe's", /\blowe'?s\b/i],
+  ['Starbucks', /starbucks/i], ['CVS', /\bcvs\b/i], ['Walgreens', /walgreens/i], ["Trader Joe's", /trader\s*joe/i],
+  ['Whole Foods', /whole\s*foods/i], ['Safeway', /safeway/i], ['Kroger', /kroger/i], ['Ralphs', /\bralphs\b/i],
+  ['Vons', /\bvons\b/i], ['Albertsons', /albertsons/i], ['Sprouts', /sprouts/i], ['Smart & Final', /smart\s*(&|and)?\s*final/i],
+  ['Best Buy', /best\s*buy/i], ['Apple', /apple\s*store|apple\.com/i], ["McDonald's", /mc\s*donald/i],
+  ['Chipotle', /chipotle/i], ['Taco Bell', /taco\s*bell/i], ['Chick-fil-A', /chick[\s\-]?fil[\s\-]?a/i],
+  ['In-N-Out', /in[\s\-]?n[\s\-]?out/i], ['Subway', /\bsubway\b/i], ["Wendy's", /wendy'?s/i], ['Burger King', /burger\s*king/i],
+  ['Jack in the Box', /jack\s*in\s*the\s*box/i], ['Panda Express', /panda\s*express/i], ['Panera', /panera/i],
+  ['Dunkin', /dunkin/i], ["Domino's", /domino'?s/i], ['Pizza Hut', /pizza\s*hut/i], ['Five Guys', /five\s*guys/i],
+  ['Shell', /\bshell\b/i], ['Chevron', /chevron/i], ['Arco', /\barco\b/i], ['Exxon', /exxon/i], ['Mobil', /\bmobil\b/i],
+  ['7-Eleven', /7[\s\-]?eleven/i], ['Circle K', /circle\s*k\b/i], ['Uber Eats', /uber\s*eats/i], ['Uber', /\buber\b/i],
+  ['Lyft', /\blyft\b/i], ['IKEA', /\bikea\b/i], ["Macy's", /macy'?s/i], ['Nordstrom', /nordstrom/i], ['Sephora', /sephora/i],
+  ['Ulta', /\bulta\b/i], ['Petco', /petco/i], ['PetSmart', /petsmart/i], ['Staples', /staples/i], ['Office Depot', /office\s*depot/i],
+  ['Dollar Tree', /dollar\s*tree/i], ['Dollar General', /dollar\s*general/i], ['Rite Aid', /rite\s*aid/i],
+  ['TJ Maxx', /t\.?\s*j\.?\s*maxx/i], ['Marshalls', /marshalls/i], ['Ross', /ross\s*dress/i], ['Publix', /publix/i],
+  ['Aldi', /\baldi\b/i], ['Lidl', /\blidl\b/i], ['Meijer', /meijer/i], ['Wegmans', /wegmans/i], ['H-E-B', /\bh[\s\-]?e[\s\-]?b\b/i],
+  ["BJ's", /\bbj'?s\s*wholesale/i], ['Michaels', /michaels/i], ['Hobby Lobby', /hobby\s*lobby/i], ['REI', /\brei\b/i],
+  ["Dick's Sporting Goods", /dick'?s\s*sporting/i], ['Old Navy', /old\s*navy/i], ['H&M', /\bh\s*&\s*m\b/i], ['Uniqlo', /uniqlo/i],
+  ['AutoZone', /autozone/i], ["O'Reilly Auto Parts", /o'?reilly\s*auto/i], ['Wawa', /\bwawa\b/i], ['Sheetz', /sheetz/i]
+];
+
+function titleCase(s){ return s.toLowerCase().replace(/(^|[\s\-&\/])([a-z])/g, (m, a, b) => a + b.toUpperCase()); }
+function cleanVendor(s){
+  return titleCase(s.replace(/#\s*\d+.*$/, '').replace(/\b(store|str|no\.?|unit)\s*#?\d+.*$/i, '')
+    .replace(/[,\s]+\b(inc|llc|ltd|corp|corporation|co|company)\.?$/i, '').replace(/[\s\-.,:]+$/, '').trim());
+}
+function guessVendorLine(lines){
+  const skip = /receipt|welcome|thank|invoice|store\s*#|\btel\b|phone|www\.|http|@|cashier|order|transaction|\bdate\b|\btime\b|table|server|guest|survey|customer|copy/i;
+  const street = /\b(st|street|ave|avenue|rd|road|blvd|dr|drive|way|ln|lane|hwy|highway|suite|ste|pkwy|plaza)\b\.?/i;
+  for (const raw of lines.slice(0, 8)) {
+    const l = raw.replace(/[^A-Za-z0-9&'\-. ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const letters = (l.match(/[A-Za-z]/g) || []).length;
+    if (letters < 3 || letters / l.length < 0.55) continue;
+    if (skip.test(l)) continue;
+    if (/^\d/.test(l) && street.test(l)) continue;
+    if (/\b[A-Z]{2}\s+\d{5}\b/.test(raw)) continue;
+    const v = cleanVendor(l);
+    if (v.length >= 3) return v;
+  }
+  return '';
+}
+
+const AMT = /(-?\d{1,3}(?:[,.]\d{3})*[.,]\d{2}|-?\d+[.,]\d{2})(?![\d%])/g;
+function toNum(s){
+  const last = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','));
+  return parseFloat(s.slice(0, last).replace(/[.,]/g, '') + '.' + s.slice(last + 1));
+}
+function amountsIn(line){
+  const out = [];
+  for (const m of line.matchAll(AMT)) { const n = toNum(m[1]); if (isFinite(n) && n > 0 && n < 1e6) out.push(n); }
+  return out;
+}
+function findTotal(lines){
+  const tiers = [
+    /grand\s*total|amount\s*paid|total\s*paid|total\s*charged|you\s*paid/i,
+    /(total|amount|balance)\s*due|total\s*amount|order\s*total|invoice\s*total|total\s*sale/i,
+    /\bt[o0]tal\b/i
+  ];
+  const bad = /sub\s*-?\s*t[o0]tal|saving|saved|discount|total\s*tax|tax\s*total|^\s*(sales\s*)?tax|gratuity|points|items|change|tendered|qty/i;
+  for (const re of tiers) {
+    let best = null;
+    lines.forEach((l, i) => {
+      if (!re.test(l) || bad.test(l)) return;
+      let a = amountsIn(l);
+      if (!a.length && lines[i + 1]) a = amountsIn(lines[i + 1]);
+      for (const n of a) if (best == null || n > best) best = n;
+    });
+    if (best != null) return Math.round(best * 100) / 100;
+  }
+  const all = lines.filter(l => !/%|change|cash|tendered|saving/i.test(l)).flatMap(amountsIn);
+  return all.length ? Math.max(...all) : null;
+}
+
+const MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12};
+function findDate(text){
+  const found = [];
+  const maxISO = isoDate(new Date(Date.now() + 86400000));
+  const push = (idx, y, m, d) => {
+    if (y < 100) y += 2000;
+    if (!m || m > 12 || d < 1 || d > 31 || y < 2000) return;
+    const dt = new Date(y, m - 1, d);
+    if (dt.getMonth() !== m - 1) return;
+    const iso = isoDate(dt);
+    if (iso <= maxISO) found.push({idx, iso});
+  };
+  for (const m of text.matchAll(/\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/g)) push(m.index, +m[1], +m[2], +m[3]);
+  for (const m of text.matchAll(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4}|\d{2})\b/g)) {
+    const a = +m[1], b = +m[2], y = +m[3];
+    const dmy = settings.dateOrder === 'DMY' ? b <= 12 : a > 12;
+    if (dmy) push(m.index, y, b, a); else push(m.index, y, a, b);
+  }
+  for (const m of text.matchAll(/\b(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?,?\s*(\d{4}|\d{2})\b/gi))
+    push(m.index, +m[3], MONTHS[m[2].toLowerCase()], +m[1]);
+  for (const m of text.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s*(\d{1,2}),?\s*(\d{4}|\d{2})\b/gi))
+    push(m.index, +m[3], MONTHS[m[1].toLowerCase()], +m[2]);
+  found.sort((a, b) => a.idx - b.idx);
+  return found.length ? found[0].iso : '';
+}
+function findCurrency(text){
+  if (/€|\bEUR\b/.test(text)) return 'EUR';
+  if (/£|\bGBP\b/.test(text)) return 'GBP';
+  if (/\bCAD\b|C\$/.test(text)) return 'CAD';
+  if (/\bAUD\b|A\$/.test(text)) return 'AUD';
+  if (/¥|\bJPY\b|円/.test(text)) return 'JPY';
+  if (/₹|\bINR\b/.test(text)) return 'INR';
+  if (/\$|\bUSD\b/.test(text)) return /^(USD|CAD|AUD|NZD|MXN|SGD|HKD)$/.test(settings.currency) ? settings.currency : 'USD';
+  return settings.currency;
+}
+function parseReceipt(text){
+  const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  let vendor = '', guess = '';
+  for (const [name, re] of BRANDS) if (re.test(text)) { vendor = name; guess = name; break; }
+  if (!vendor) { guess = guessVendorLine(lines); vendor = guess; }
+  const alias = guess && settings.aliases[guess.toLowerCase()];
+  if (alias) vendor = alias;
+  return {vendor, guess, date: findDate(text), total: findTotal(lines), currency: findCurrency(text)};
+}
+
+async function extract(rec){
+  const text = rec.mime === 'application/pdf' ? await readPdf(rec.file) : await ocr(rec.file);
+  rec.ocrText = text.trim();
+  return parseReceipt(text);
+}
+
+function matchExistingVendor(name){
+  const k = name.trim().toLowerCase();
+  const hit = receipts.find(r => r.vendor && r.vendor.trim().toLowerCase() === k);
+  return hit ? hit.vendor : name.trim();
+}
+function applyExtraction(rec, d){
+  rec.guess = d.guess || '';
+  rec.vendor = d.vendor ? matchExistingVendor(d.vendor) : '';
+  rec.date = DATE_RE.test(String(d.date || '')) ? d.date : '';
+  rec.total = d.total != null && isFinite(d.total) ? Math.round(d.total * 100) / 100 : null;
+  rec.currency = /^[A-Z]{3}$/.test(d.currency || '') ? d.currency : settings.currency;
+  const missing = [!rec.vendor && 'store', !rec.date && 'date', rec.total == null && 'total'].filter(Boolean);
+  rec.status = missing.length ? 'review' : 'done';
+  rec.error = missing.length ? `Couldn't find the ${missing.join(' or ')}. Tap the fields below to fill them in.` : '';
+}
+
+let busy = false, readerWarned = false;
+async function processQueue(){
+  if (busy) return; busy = true;
+  try {
+    for (;;) {
+      const r = receipts.find(x => x.status === 'processing');
+      if (!r) break;
+      ocrLogger = (m) => {
+        if (/loading|initializ/i.test(m.status || '') && !readerWarned) { readerWarned = true; toast('Getting the reader ready (first time can take a minute)…', 4000); }
+        if (current === r.id && m.status === 'recognizing text') {
+          const s = $('#dStatus .msg'); if (s) s.textContent = `Reading on your iPhone… ${Math.round((m.progress || 0) * 100)}%`;
+        }
+      };
+      try { applyExtraction(r, await extract(r)); }
+      catch (e) { r.status = 'error'; r.error = e.message || String(e); }
+      ocrLogger = null;
+      await dbPut(r);
+      render();
+      if (current === r.id && !formDirty) fillDetail(r);
+      else if (current === r.id) renderDetailStatus(r);
+    }
+  } finally { busy = false; render(); }
+}
+
+/* ---------- state ---------- */
+let receipts = [];
+let view = {tab:'receipts', folder:null};
+const filt = {q:'', from:'', to:''};
+let current = null, formDirty = false;
+
+function folderKey(r){
+  if (!r.vendor) return r.status === 'processing' ? '__processing' : '__unsorted';
+  return r.vendor.trim().toLowerCase();
+}
+function folderName(key, items){
+  if (key === '__processing') return 'Reading…';
+  if (key === '__unsorted') return 'Needs Review';
+  return items[0].vendor.trim();
+}
+function filtered(){
+  const q = filt.q.trim().toLowerCase();
+  return receipts.filter(r => {
+    if (q && !(r.vendor || '').toLowerCase().includes(q) && r.status !== 'processing') return false;
+    if (filt.from && (!r.date || r.date < filt.from)) return false;
+    if (filt.to && (!r.date || r.date > filt.to)) return false;
+    return true;
+  });
+}
+function byDateDesc(a, b){
+  if (a.date && b.date && a.date !== b.date) return a.date < b.date ? 1 : -1;
+  if (a.date && !b.date) return -1; if (!a.date && b.date) return 1;
+  return b.created - a.created;
+}
+function totalsText(items){
+  const sums = {};
+  for (const r of items) if (r.total != null) { const c = r.currency || settings.currency; sums[c] = (sums[c] || 0) + r.total; }
+  const parts = Object.entries(sums).sort((a, b) => b[1] - a[1]).map(([c, v]) => fmtMoney(v, c));
+  if (!parts.length) return '—';
+  return parts.length > 2 ? parts.slice(0, 2).join(' + ') + ' …' : parts.join(' + ');
+}
+
+/* ---------- rendering ---------- */
+const ICON_FOLDER = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A2.5 2.5 0 015.5 4h4l2 2.2h7A2.5 2.5 0 0121 8.7v8.8a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 17.5z"/></svg>';
+
+function render(){
+  $('#tabReceipts').classList.toggle('hidden', view.tab !== 'receipts');
+  $('#tabSettings').classList.toggle('hidden', view.tab !== 'settings');
+  $('#actions').classList.toggle('hidden', view.tab !== 'receipts');
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === view.tab));
+  $('#clearQ').classList.toggle('hidden', !filt.q);
+  updateVendorList();
+  if (view.tab === 'settings') return renderSettings();
+  if (view.folder) renderFolder(); else renderHome();
+}
+
+function renderHome(){
+  $('#backBtn').classList.add('hidden'); $('#renameBtn').classList.add('hidden');
+  $('#pageTitle').textContent = 'Receipts';
+  const list = filtered();
+  const groups = new Map();
+  for (const r of list) {
+    const k = folderKey(r);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  const keys = [...groups.keys()].sort((a, b) => {
+    const pa = a.startsWith('__') ? 0 : 1, pb = b.startsWith('__') ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return folderName(a, groups.get(a)).localeCompare(folderName(b, groups.get(b)), undefined, {sensitivity:'base'});
+  });
+  const vendorCount = keys.filter(k => !k.startsWith('__')).length;
+  $('#pageSub').textContent = receipts.length
+    ? `${list.length} receipt${list.length === 1 ? '' : 's'} · ${vendorCount} vendor${vendorCount === 1 ? '' : 's'}${list.length ? ' · ' + totalsText(list) : ''}`
+    : '';
+
+  const c = $('#content');
+  if (!receipts.length) {
+    c.innerHTML = `<div class="empty"><div class="big">🧾</div><b>No receipts yet</b>
+      Tap <b style="display:inline;font-size:inherit">Scan Receipt</b> to photograph one, or Upload to pick photos and PDFs.
+      <br><br>Everything is read and stored on this iPhone.</div>`;
+    return;
+  }
+  if (!list.length) { c.innerHTML = `<div class="empty"><b>No matches</b>Try another search or date range.</div>`; return; }
+
+  c.innerHTML = '<div class="grid">' + keys.map(k => {
+    const items = groups.get(k); const name = folderName(k, items);
+    let iconBg, inner;
+    if (k === '__processing') { iconBg = 'var(--orange)'; inner = '<span class="spin" style="border-top-color:#fff;border-color:rgba(255,255,255,.35);border-top-color:#fff"></span>'; }
+    else if (k === '__unsorted') { iconBg = 'var(--sub)'; inner = ICON_FOLDER; }
+    else { iconBg = `hsl(${hue(k)} 62% 52%)`; inner = esc(name.charAt(0).toUpperCase()); }
+    const flagged = items.some(r => r.status === 'error' || r.status === 'review');
+    return `<button class="folder" data-folder="${esc(k)}">
+      <div class="ficon" style="background:${iconBg}">${inner}</div>
+      <div class="fname">${esc(name)}${flagged && !k.startsWith('__') ? ' <span style="color:var(--red)">•</span>' : ''}</div>
+      <div class="fmeta">${items.length} receipt${items.length === 1 ? '' : 's'}</div>
+      <div class="ftotal">${k === '__processing' ? '' : esc(totalsText(items))}</div>
+    </button>`;
+  }).join('') + '</div>';
+}
+
+function rowHTML(r){
+  const thumb = r.mime === 'application/pdf'
+    ? '<div class="thumb">PDF</div>'
+    : (r.thumb ? `<img class="thumb" src="${objURL(r.id + ':t', r.thumb)}" alt="">` : '<div class="thumb"></div>');
+  let badge = '';
+  if (r.status === 'processing') badge = '<span class="badge b-processing">Reading</span>';
+  else if (r.status === 'error') badge = '<span class="badge b-error">Error</span>';
+  else if (r.status === 'review') badge = '<span class="badge b-review">Review</span>';
+  return `<button class="row" data-id="${r.id}">
+    ${thumb}
+    <div class="rmain">
+      <div class="rtitle">${esc(r.vendor || (r.status === 'processing' ? 'Reading receipt…' : 'Unknown vendor'))}</div>
+      <div class="rsub">${esc(fmtDate(r.date))} ${badge}</div>
+    </div>
+    <div class="ramt">${r.status === 'processing' ? '<span class="spin"></span>' : esc(fmtMoney(r.total, r.currency))}</div>
+    <span class="chev">›</span>
+  </button>`;
+}
+
+function renderFolder(){
+  const items = filtered().filter(r => folderKey(r) === view.folder).sort(byDateDesc);
+  if (!items.length) { view.folder = null; return renderHome(); }
+  const name = folderName(view.folder, items);
+  $('#backBtn').classList.remove('hidden');
+  $('#renameBtn').classList.toggle('hidden', view.folder.startsWith('__'));
+  $('#pageTitle').textContent = name;
+  $('#pageSub').textContent = `${items.length} receipt${items.length === 1 ? '' : 's'} · ${totalsText(items)}`;
+
+  // group by month
+  const months = new Map();
+  for (const r of items) {
+    const m = r.date ? new Date(r.date + 'T00:00:00').toLocaleDateString(undefined, {month:'long', year:'numeric'}) : 'No date';
+    if (!months.has(m)) months.set(m, []);
+    months.get(m).push(r);
+  }
+  $('#content').innerHTML = [...months.entries()].map(([m, rs]) =>
+    `<div class="section-title">${esc(m)}</div><div class="list">${rs.map(rowHTML).join('')}</div>`
+  ).join('');
+}
+
+function updateVendorList(){
+  const names = [...new Set(receipts.map(r => r.vendor).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  $('#vendorList').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+}
+
+async function renderSettings(){
+  $('#sOrder').value = settings.dateOrder;
+  $('#sCur').value = settings.currency;
+  $('#stCount').value = receipts.length;
+  try {
+    const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
+    $('#stUsed').value = est ? fmtBytes(est.usage) : 'Unknown';
+    const p = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false;
+    $('#stPersist').value = p ? 'Yes' : 'Not yet';
+  } catch { $('#stUsed').value = 'Unknown'; }
+}
+
+/* ---------- detail sheet ---------- */
+function openDetail(id){
+  const r = receipts.find(x => x.id === id); if (!r) return;
+  current = id; formDirty = false;
+  fillDetail(r);
+  $('#sheet').classList.add('open'); $('#sheet').setAttribute('aria-hidden', 'false');
+  document.body.classList.add('locked');
+  $('.sbody').scrollTop = 0;
+}
+function closeDetail(){
+  current = null; formDirty = false;
+  $('#sheet').classList.remove('open'); $('#sheet').setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('locked');
+  if (document.activeElement) document.activeElement.blur();
+}
+function fillDetail(r){
+  $('#dTitle').textContent = r.vendor || 'Receipt';
+  const url = objURL(r.id, r.file);
+  $('#dPreview').innerHTML = r.mime === 'application/pdf'
+    ? `<iframe src="${url}" title="PDF"></iframe><a class="btn" href="${url}" target="_blank" rel="noopener" style="margin:0;border-radius:0">Open Full PDF</a>`
+    : `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="Receipt"></a>`;
+  $('#fVendor').value = r.vendor || '';
+  $('#fDate').value = r.date || '';
+  $('#fTotal').value = r.total != null ? r.total.toFixed(2) : '';
+  $('#fCur').value = r.currency || settings.currency;
+  $('#dText').textContent = r.ocrText || '';
+  $('#dTextWrap').classList.toggle('hidden', !r.ocrText);
+  $('#dTextWrap').open = false;
+  renderDetailStatus(r);
+}
+function renderDetailStatus(r){
+  const s = $('#dStatus');
+  if (r.status === 'processing') s.innerHTML = '<div class="status"><span class="spin"></span><span class="msg">Reading on your iPhone…</span></div>';
+  else if (r.status === 'error') s.innerHTML = `<div class="status err">⚠️ ${esc(r.error)}</div>`;
+  else if (r.status === 'review') s.innerHTML = `<div class="status">${esc(r.error || 'Check the details below.')}</div>`;
+  else s.innerHTML = '';
+  $('#dRescan').disabled = r.status === 'processing';
+}
+
+async function saveDetail(){
+  const r = receipts.find(x => x.id === current); if (!r) return closeDetail();
+  const vendor = $('#fVendor').value.trim();
+  const date = $('#fDate').value;
+  let t = $('#fTotal').value.trim();
+  if (t.includes(',') && !t.includes('.')) t = t.replace(',', '.');
+  t = t.replace(/[^\d.\-]/g, '');
+  const total = t === '' ? null : parseFloat(t);
+  if (t !== '' && !isFinite(total)) return toast('Total must be a number');
+  const cur = $('#fCur').value.trim().toUpperCase();
+  r.vendor = vendor ? matchExistingVendor(vendor) : '';
+  if (r.vendor && r.guess && r.guess.toLowerCase() !== r.vendor.toLowerCase()) settings.setAlias(r.guess, r.vendor);
+  r.date = DATE_RE.test(date) ? date : '';
+  r.total = total == null ? null : Math.round(total * 100) / 100;
+  r.currency = /^[A-Z]{3}$/.test(cur) ? cur : settings.currency;
+  if (r.status !== 'processing') { r.status = r.vendor ? 'done' : 'review'; r.error = ''; }
+  await dbPut(r);
+  closeDetail(); render(); toast('Saved');
+}
+
+/* ---------- file naming ---------- */
+const folderSafe = (s) => (s || 'Unsorted').normalize('NFC').replace(/[^\p{L}\p{N}\-]+/gu, '_').replace(/^_+|_+$/g, '') || 'Unsorted';
+const nameSafe = (s) => (s || 'Unsorted').normalize('NFC').replace(/[^\p{L}\p{N}\-]+/gu, '') || 'Unsorted';
+function fileNameFor(r){
+  const ext = r.mime === 'application/pdf' ? 'pdf' : 'jpg';
+  const amt = r.total != null ? r.total.toFixed(2) : '0.00';
+  return `${r.date || 'undated'}_${nameSafe(r.vendor)}_${amt}.${ext}`;
+}
+
+async function shareOrDownload(blob, name, type){
+  const file = new File([blob], name, {type});
+  if (navigator.canShare && navigator.canShare({files:[file]})) {
+    try { await navigator.share({files:[file]}); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+/* ---------- export ---------- */
+function loadJSZip(){
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = () => window.JSZip ? res(window.JSZip) : rej(new Error('JSZip failed to load'));
+    s.onerror = () => rej(new Error('Could not download JSZip. Connect to the internet and try again.'));
+    document.head.appendChild(s);
+  });
+}
+let exportFile = null;
+async function startExport(items){
+  exportFile = null;
+  const ov = $('#exportOverlay'), go = $('#exGo');
+  go.disabled = true; go.textContent = 'Preparing…';
+  $('#exTitle').textContent = 'Save to iPhone Files';
+  if (!items.length) { $('#exMsg').textContent = 'No receipts to export.'; go.textContent = 'Nothing to save'; ov.classList.add('open'); return; }
+  $('#exMsg').textContent = `Bundling ${items.length} receipt${items.length === 1 ? '' : 's'} into vendor folders…`;
+  ov.classList.add('open');
+  try {
+    const JSZip = await loadJSZip();
+    const zip = new JSZip(); const root = zip.folder('Receipts');
+    const used = new Set();
+    const csv = [['Vendor','Date','Total','Currency','File'].join(',')];
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    for (const r of [...items].sort(byDateDesc)) {
+      const folder = folderSafe(r.vendor);
+      let name = fileNameFor(r), path = `${folder}/${name}`, i = 2;
+      while (used.has(path.toLowerCase())) { name = fileNameFor(r).replace(/(\.\w+)$/, `_${i++}$1`); path = `${folder}/${name}`; }
+      used.add(path.toLowerCase());
+      root.folder(folder).file(name, r.file, {binary:true});
+      csv.push([q(r.vendor), q(r.date), r.total != null ? r.total.toFixed(2) : '', q(r.currency), q(path)].join(','));
+    }
+    root.file('receipts.csv', '﻿' + csv.join('\n'));
+    const blob = await zip.generateAsync({type:'blob', compression:'STORE', mimeType:'application/zip'});
+    exportFile = {blob, name: `Receipts_${todayISO()}.zip`};
+    $('#exMsg').textContent = `Ready: ${exportFile.name} (${fmtBytes(blob.size)}). Tap below, choose "Save to Files", then "On My iPhone". Tap the zip in Files to unpack the folders.`;
+    go.disabled = false; go.textContent = 'Save to Files';
+  } catch (e) {
+    $('#exMsg').textContent = e.message || String(e);
+    go.textContent = 'Export failed';
+  }
+}
+
+/* ---------- events ---------- */
+$('#scanBtn').onclick = () => $('#camInput').click();
+$('#uploadBtn').onclick = () => $('#fileInput').click();
+$('#camInput').onchange = (e) => { addFiles([...e.target.files]); e.target.value = ''; };
+$('#fileInput').onchange = (e) => { addFiles([...e.target.files]); e.target.value = ''; };
+
+async function addFiles(files){
+  if (!files.length) return;
+  let added = 0;
+  if (files.length > 1) toast(`Adding ${files.length} files…`);
+  for (const f of files) {
+    try {
+      const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+      const isImg = (f.type || '').startsWith('image/') || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name);
+      if (!isPdf && !isImg) { toast(`${f.name}: unsupported file`); continue; }
+      let file, thumb = null, mime;
+      if (isPdf) {
+        if (f.size > 30 * 1024 * 1024) { toast(`${f.name} is over 30 MB`); continue; }
+        file = new Blob([await f.arrayBuffer()], {type:'application/pdf'}); mime = 'application/pdf';
+      } else {
+        file = await resizeImage(f, 2000, 0.85); mime = 'image/jpeg';
+        thumb = await resizeImage(file, 240, 0.7);
+      }
+      const rec = {id: uid(), created: Date.now(), vendor:'', date:'', total:null, currency:'',
+                   status:'processing', error:'', file, thumb, mime, origName: f.name};
+      await dbPut(rec); receipts.push(rec); added++;
+    } catch (e) { toast(`Couldn't add ${f.name}: ${e.message}`); }
+  }
+  if (added) { view.tab = 'receipts'; view.folder = null; render(); window.scrollTo({top:0, behavior:'smooth'}); }
+  requestPersist();
+  processQueue();
+}
+
+$('#content').addEventListener('click', (e) => {
+  const go = e.target.closest('[data-go]'); if (go) { view.tab = go.dataset.go; return render(); }
+  const f = e.target.closest('[data-folder]');
+  if (f) { view.folder = f.dataset.folder; history.pushState({folder: view.folder}, ''); render(); window.scrollTo(0, 0); return; }
+  const row = e.target.closest('[data-id]'); if (row) openDetail(row.dataset.id);
+});
+$('#backBtn').onclick = () => { if (history.state && history.state.folder) history.back(); else { view.folder = null; render(); } };
+window.addEventListener('popstate', () => { if (current) closeDetail(); view.folder = (history.state && history.state.folder) || null; render(); });
+
+$('#renameBtn').onclick = async () => {
+  const items = receipts.filter(r => folderKey(r) === view.folder); if (!items.length) return;
+  const next = window.prompt(`Rename all ${items.length} receipt(s) in this folder to:`, items[0].vendor);
+  if (!next || !next.trim()) return;
+  const name = next.trim();
+  const existing = receipts.find(r => r.vendor && folderKey(r) !== view.folder && r.vendor.trim().toLowerCase() === name.toLowerCase());
+  const finalName = existing ? existing.vendor : name;
+  for (const r of items) { r.vendor = finalName; await dbPut(r); }
+  view.folder = finalName.toLowerCase();
+  if (history.state && history.state.folder) history.replaceState({folder: view.folder}, '');
+  render(); toast(existing ? `Merged into ${finalName}` : 'Renamed');
+};
+
+let qTimer;
+$('#q').addEventListener('input', (e) => { clearTimeout(qTimer); qTimer = setTimeout(() => { filt.q = e.target.value; render(); }, 80); });
+$('#clearQ').onclick = () => { $('#q').value = ''; filt.q = ''; render(); };
+$('#dFrom').onchange = (e) => { filt.from = e.target.value; render(); };
+$('#dTo').onchange = (e) => { filt.to = e.target.value; render(); };
+$('#resetDates').onclick = () => { filt.from = filt.to = ''; $('#dFrom').value = $('#dTo').value = ''; render(); };
+$('#chips').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-range]'); if (!c) return;
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  let from, to = todayISO();
+  switch (c.dataset.range) {
+    case 'month': from = isoDate(new Date(y, m, 1)); break;
+    case 'lastmonth': from = isoDate(new Date(y, m - 1, 1)); to = isoDate(new Date(y, m, 0)); break;
+    case '90': from = isoDate(new Date(y, m, now.getDate() - 90)); break;
+    case 'year': from = `${y}-01-01`; break;
+    case 'lastyear': from = `${y - 1}-01-01`; to = `${y - 1}-12-31`; break;
+  }
+  filt.from = from; filt.to = to; $('#dFrom').value = from; $('#dTo').value = to; render();
+});
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => { view.tab = t.dataset.tab; render(); window.scrollTo(0, 0); });
+
+$('#dCancel').onclick = closeDetail;
+$('#dSave').onclick = saveDetail;
+['#fVendor','#fDate','#fTotal','#fCur'].forEach(s => $(s).addEventListener('input', () => { formDirty = true; }));
+$('#dRescan').onclick = async () => {
+  const r = receipts.find(x => x.id === current); if (!r) return;
+  r.status = 'processing'; r.error = ''; formDirty = false;
+  await dbPut(r); renderDetailStatus(r); render(); processQueue();
+};
+$('#dShare').onclick = () => {
+  const r = receipts.find(x => x.id === current); if (!r) return;
+  shareOrDownload(r.file, fileNameFor(r), r.mime);
+};
+$('#dDelete').onclick = async () => {
+  const r = receipts.find(x => x.id === current); if (!r) return;
+  if (!confirm('Delete this receipt from your iPhone? This cannot be undone.')) return;
+  await dbDel(r.id); revoke(r.id);
+  receipts = receipts.filter(x => x.id !== r.id);
+  closeDetail(); render(); toast('Deleted');
+};
+
+$('#exportBtn').onclick = () => startExport(view.folder ? filtered().filter(r => folderKey(r) === view.folder) : filtered());
+$('#exportAll').onclick = () => startExport(receipts);
+$('#exGo').onclick = () => { if (exportFile) shareOrDownload(exportFile.blob, exportFile.name, 'application/zip'); };
+$('#exCancel').onclick = () => { $('#exportOverlay').classList.remove('open'); exportFile = null; };
+$('#exportOverlay').addEventListener('click', (e) => { if (e.target.id === 'exportOverlay') $('#exCancel').click(); });
+
+$('#sCur').addEventListener('change', (e) => { settings.currency = e.target.value; e.target.value = settings.currency; toast('Currency saved'); });
+$('#sOrder').addEventListener('change', (e) => { settings.dateOrder = e.target.value; toast('Date order saved'); });
+$('#prepReader').onclick = async () => {
+  const out = $('#prepOut'), btn = $('#prepReader');
+  out.classList.remove('hidden', 'err'); out.textContent = 'Downloading the reader…'; btn.disabled = true;
+  ocrLogger = (m) => { if (m.progress != null && m.status) out.textContent = `${m.status[0].toUpperCase() + m.status.slice(1)}… ${Math.round(m.progress * 100)}%`; };
+  try { await getWorker(); out.textContent = '✅ Reader is ready. Receipts are read on this iPhone.'; }
+  catch (e) { out.classList.add('err'); out.textContent = '❌ ' + (e.message || e); }
+  finally { ocrLogger = null; btn.disabled = false; }
+};
+$('#wipe').onclick = async () => {
+  if (!receipts.length) return toast('Nothing to delete');
+  if (!confirm(`Delete all ${receipts.length} receipts from this iPhone? Export a backup first if you need one.`)) return;
+  if (!confirm('Are you sure? This cannot be undone.')) return;
+  await dbClear(); receipts.forEach(r => revoke(r.id)); receipts = []; view.folder = null;
+  render(); toast('All receipts deleted');
+};
+
+/* ---------- home screen icon ---------- */
+function makeIcon(){
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 180;
+    const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, 180); g.addColorStop(0, '#2b8cff'); g.addColorStop(1, '#0057d9');
+    x.fillStyle = g; x.fillRect(0, 0, 180, 180);
+    x.fillStyle = '#fff';
+    x.beginPath(); x.moveTo(52, 36); x.lineTo(128, 36); x.lineTo(128, 144);
+    for (let i = 0; i < 6; i++) { const px = 128 - i * 12.67; x.lineTo(px - 6.3, 136); x.lineTo(px - 12.67, 144); }
+    x.closePath(); x.fill();
+    x.fillStyle = '#0a6cff';
+    [[64, 58, 52], [64, 74, 40], [64, 90, 46]].forEach(([a, b, w]) => x.fillRect(a, b, w, 7));
+    x.fillRect(64, 112, 52, 9);
+    $('#touchIcon').href = c.toDataURL('image/png');
+  } catch {}
+}
+
+/* ---------- boot ---------- */
+(async function boot(){
+  makeIcon();
+  try {
+    db = await openDB();
+    receipts = await dbAll();
+  } catch (e) {
+    $('#content').innerHTML = `<div class="empty"><b>Storage unavailable</b>${esc(e.message || e)}<br><br>Private Browsing blocks local storage. Open this page in a normal Safari tab.</div>`;
+    return;
+  }
+  history.replaceState({folder:null}, '');
+  render();
+  if (receipts.some(r => r.status === 'processing')) processQueue();
+})();
+})();
+</script>
+</body>
+</html>
